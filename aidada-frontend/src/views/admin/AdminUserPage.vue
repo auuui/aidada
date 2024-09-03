@@ -39,7 +39,7 @@
     @page-change="onPageChange"
   >
     <template #userAvatar="{ record }">
-      <a-image width="64" :src="record.userAvtar" />
+      <a-image width="64" :src="record.userAvatar" />
     </template>
     <template #createTime="{ record }">
       {{ dayjs(record.createTime).format("YYYY-MM-DD HH:mm:ss") }}

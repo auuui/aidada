@@ -19,20 +19,6 @@
         allow-clear
       />
     </a-form-item>
-    <a-form-item field="appId" label="应用 id">
-      <a-input
-        v-model="formSearchParams.appId"
-        placeholder="请输入应用 id"
-        allow-clear
-      />
-    </a-form-item>
-    <a-form-item field="userId" label="用户 id">
-      <a-input
-        v-model="formSearchParams.userId"
-        placeholder="请输入用户 id"
-        allow-clear
-      />
-    </a-form-item>
     <a-form-item>
       <a-button type="primary" html-type="submit" style="width: 100px">
         搜索
@@ -61,6 +47,7 @@
     </template>
     <template #optional="{ record }">
       <a-space>
+        <a-button status="success" @click="doUpdate?.(record)">修改</a-button>
         <a-button status="danger" @click="doDelete(record)">删除</a-button>
       </a-space>
     </template>
@@ -68,14 +55,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect } from "vue";
+import { defineExpose, ref, watchEffect, withDefaults, defineProps } from "vue";
 import {
   deleteScoringResultUsingPost,
-  listScoringResultByPageUsingPost,
+  listScoringResultVoByPageUsingPost,
 } from "@/api/scoringResultController";
 import API from "@/api";
 import message from "@arco-design/web-vue/es/message";
 import { dayjs } from "@arco-design/web-vue/es/_utils/date";
+
+interface Props {
+  appId: string;
+  doUpdate: (scoringResult: API.ScoringResultVO) => void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  appId: () => "",
+});
 
 const formSearchParams = ref<API.ScoringResultQueryRequest>({});
 
@@ -83,19 +79,28 @@ const formSearchParams = ref<API.ScoringResultQueryRequest>({});
 const initSearchParams = {
   current: 1,
   pageSize: 10,
+  sortField: "createTime",
+  sortOrder: "descend",
 };
 
 const searchParams = ref<API.ScoringResultQueryRequest>({
   ...initSearchParams,
 });
-const dataList = ref<API.ScoringResult[]>([]);
+const dataList = ref<API.ScoringResultVO[]>([]);
 const total = ref<number>(0);
 
 /**
  * 加载数据
  */
 const loadData = async () => {
-  const res = await listScoringResultByPageUsingPost(searchParams.value);
+  if (!props.appId) {
+    return;
+  }
+  const params = {
+    ...searchParams.value,
+    appId: props.appId as any,
+  };
+  const res = await listScoringResultVoByPageUsingPost(params);
   if (res.data.code === 0) {
     dataList.value = res.data.data?.records || [];
     total.value = res.data.data?.total || 0;
@@ -103,6 +108,11 @@ const loadData = async () => {
     message.error("获取数据失败，" + res.data.message);
   }
 };
+
+// 暴露函数给父组件
+defineExpose({
+  loadData,
+});
 
 /**
  * 执行搜索
