@@ -4,7 +4,7 @@
       <h1>{{ app?.appName }}</h1>
       <p>{{ app?.appDesc }}</p>
       <h2 style="margin-bottom: 16px">
-        <!--        {{ current }}、-->
+        {{ current }}、
         {{ currentQuestion?.title }}
       </h2>
       <div>
@@ -32,8 +32,9 @@
             circle
             :disabled="!currentAnswer"
             @click="doSubmit"
+            :loading="submitting"
           >
-            查看结果
+            {{ submitting ? "测评中" : "查看结果" }}
           </a-button>
           <a-button v-if="current > 1" circle @click="current -= 1">
             上一题
@@ -105,6 +106,9 @@ const questionOptions = computed(() => {
 const currentAnswer = ref<string>();
 // 回答列表
 const answerList = reactive<string[]>([]);
+
+//是否正在提交
+const submitting = ref(false);
 
 /**
  * 添加题目选项
@@ -211,6 +215,7 @@ const doSubmit = async () => {
   if (!props.appId || !answerList) {
     return;
   }
+  submitting.value = true;
   const res = await addUserAnswerUsingPost({
     appId: props.appId as any,
     choices: answerList,
@@ -221,5 +226,6 @@ const doSubmit = async () => {
   } else {
     message.error("提交答案失败，" + res.data.message);
   }
+  submitting.value = false;
 };
 </script>

@@ -8,14 +8,20 @@
       :model="questionContent"
       @submit="handleSubmit"
     >
-      {{ questionContent }}
       <a-form-item label="应用 id">
         {{ appId }}
       </a-form-item>
       <a-form-item label="题目列表" :content-flex="false" :merge-props="false">
-        <a-button @click="addQuestion(questionContent.length)">
-          底部添加题目
-        </a-button>
+        <a-space size="medium">
+          <a-button @click="addQuestion(questionContent.length)">
+            底部添加题目
+          </a-button>
+          <!--ai生成抽屉-->
+          <AiGenerateQuestionDrawer
+            :appId="appId"
+            :onSuccess="onAiGenerateSuccess"
+          />
+        </a-space>
         <!-- 遍历每道题目 -->
         <div v-for="(question, index) of questionContent" :key="index">
           <!-- 题目信息展示 -->
@@ -101,17 +107,11 @@ import { useRouter } from "vue-router";
 import API from "@/api";
 import { useLoginUserStore } from "@/store/userStore";
 import {
-  addAppUsingPost,
-  editAppUsingPost,
-  getAppVoByIdUsingGet,
-} from "@/api/appController";
-import { APP_SCORING_STRATEGY_MAP, APP_TYPE_MAP } from "@/constant/app";
-import PictureUploader from "@/components/PictureUploader.vue";
-import {
   addQuestionUsingPost,
   editQuestionUsingPost,
   listQuestionVoByPageUsingPost,
 } from "@/api/questionController";
+import AiGenerateQuestionDrawer from "@/views/add/components/AiGenerateQuestionDrawer.vue";
 
 interface Props {
   appId: string;
@@ -241,5 +241,11 @@ const handleSubmit = async () => {
   } else {
     message.error("操作失败，" + res.data.message);
   }
+};
+
+// Ai生成题目后执行
+const onAiGenerateSuccess = (result: API.QuestionContentDTO[]) => {
+  message.success(`AI生成题目成功,生成了${result.length}道题目`);
+  questionContent.value = [...questionContent.value, ...result];
 };
 </script>

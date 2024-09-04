@@ -1,7 +1,7 @@
 <template>
   <div class="about">
-    <h1>This is an about page</h1>
-    {{ JSON.stringify(loginUserStore.loginUser) }};
+    <h1>关于我们</h1>
+    <p>暂无</p>
   </div>
 </template>
 
