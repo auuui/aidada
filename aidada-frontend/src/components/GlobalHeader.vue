@@ -14,7 +14,7 @@
           >
             <div class="titleBar">
               <img class="logo" src="../assets/logo.png" />
-              <div class="title">哒哒哒</div>
+              <div class="title">智慧测评哒哒哒</div>
             </div>
           </a-menu-item>
           <a-menu-item v-for="item in visibleRoutes" :key="item.path">

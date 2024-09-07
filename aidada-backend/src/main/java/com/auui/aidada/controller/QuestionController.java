@@ -1,5 +1,6 @@
 package com.auui.aidada.controller;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.auui.aidada.model.dto.question.*;
 import com.auui.aidada.model.vo.QuestionVO;
@@ -21,13 +22,20 @@ import com.auui.aidada.model.enums.AppTypeEnum;
 import com.auui.aidada.service.AppService;
 import com.auui.aidada.service.QuestionService;
 import com.auui.aidada.service.UserService;
+import com.zhipu.oapi.service.v4.model.ModelData;
+import io.reactivex.Flowable;
+import io.reactivex.Scheduler;
+import io.reactivex.schedulers.Schedulers;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 题目接口
@@ -48,6 +56,9 @@ public class QuestionController {
 
     @Resource
     private AiManager aiManager;
+
+    @Resource
+    private Scheduler vipScheduler;
 
     // region 增删改查
 
@@ -309,6 +320,143 @@ public class QuestionController {
         String json = result.substring(start, end + 1);
         List<QuestionContentDTO> questionContentDTOList = JSONUtil.toList(json, QuestionContentDTO.class);
         return ResultUtils.success(questionContentDTOList);
+    }
+
+    @GetMapping("/ai_generate/sse")
+    public SseEmitter aiGenerateQuestionSSE(AiGenerateQuestionRequest aiGenerateQuestionRequest,HttpServletRequest request) {
+        ThrowUtils.throwIf(aiGenerateQuestionRequest == null, ErrorCode.PARAMS_ERROR);
+        // 获取参数
+        Long appId = aiGenerateQuestionRequest.getAppId();
+        int questionNumber = aiGenerateQuestionRequest.getQuestionNumber();
+        int optionNumber = aiGenerateQuestionRequest.getOptionNumber();
+        // 获取应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+
+        // 封装 Prompt
+        String userMessage = getGenerateQuestionUserMessage(app, questionNumber, optionNumber);
+        // 建立 SSE 连接对象，0 表示不超时
+        SseEmitter emitter = new SseEmitter(0L);
+        // AI 生成，sse 流式返回
+        Flowable<ModelData> modelDataFlowable = aiManager.doStreamRequest(GENERATE_QUESTION_SYSTEM_MESSAGE, userMessage, null);
+        //拼接完整题目
+        StringBuilder contentBuilder = new StringBuilder();
+        //左括号计数器，当回归为0时，表示左括号等于右括号可以截取
+        AtomicInteger flag = new AtomicInteger(0);
+
+        //获取登录用户
+        User loginUser = userService.getLoginUser(request);
+        //默认全局线程池
+        Scheduler scheduler= Schedulers.io();
+        if ("vip".equals(loginUser.getUserRole())){
+            scheduler=vipScheduler;
+        }
+        modelDataFlowable
+                // 异步线程池执行
+                .observeOn(scheduler)
+                .map(chunk -> chunk.getChoices().get(0).getDelta().getContent())
+                .map(message -> message.replaceAll("\\s", ""))
+                .filter(StrUtil::isNotBlank)
+                .flatMap(message -> {
+                    // 将字符串转换为 List<Character>
+                    List<Character> charList = new ArrayList<>();
+                    for (char c : message.toCharArray()) {
+                        charList.add(c);
+                    }
+                    return Flowable.fromIterable(charList);
+                })
+                .doOnNext(c -> {
+                    {
+                        // 识别第一个 [ 表示开始 AI 传输 json 数据，打开 flag 开始拼接 json 数组
+                        if (c == '{') {
+                            flag.addAndGet(1);
+                        }
+                        if (flag.get() > 0) {
+                            contentBuilder.append(c);
+                        }
+                        if (c == '}') {
+                            flag.addAndGet(-1);
+                            if (flag.get() == 0) {
+                                // 累积单套题目满足 json 格式后，sse 推送至前端
+                                // sse 需要压缩成当行 json，sse 无法识别换行
+                                emitter.send(JSONUtil.toJsonStr(contentBuilder.toString()));
+                                // 清空 StringBuilder
+                                contentBuilder.setLength(0);
+                            }
+                        }
+                    }
+                }).doOnComplete(emitter::complete).subscribe();
+        return emitter;
+    }
+
+    //仅测试隔离线程池使用
+    @Deprecated
+    @GetMapping("/ai_generate/sse/test")
+    public SseEmitter aiGenerateQuestionSSETest(AiGenerateQuestionRequest aiGenerateQuestionRequest,Boolean isVip) {
+        ThrowUtils.throwIf(aiGenerateQuestionRequest == null, ErrorCode.PARAMS_ERROR);
+        // 获取参数
+        Long appId = aiGenerateQuestionRequest.getAppId();
+        int questionNumber = aiGenerateQuestionRequest.getQuestionNumber();
+        int optionNumber = aiGenerateQuestionRequest.getOptionNumber();
+        // 获取应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+
+        // 封装 Prompt
+        String userMessage = getGenerateQuestionUserMessage(app, questionNumber, optionNumber);
+        // 建立 SSE 连接对象，0 表示不超时
+        SseEmitter emitter = new SseEmitter(0L);
+        // AI 生成，sse 流式返回
+        Flowable<ModelData> modelDataFlowable = aiManager.doStreamRequest(GENERATE_QUESTION_SYSTEM_MESSAGE, userMessage, null);
+        //拼接完整题目
+        StringBuilder contentBuilder = new StringBuilder();
+        //左括号计数器，当回归为0时，表示左括号等于右括号可以截取
+        AtomicInteger flag = new AtomicInteger(0);
+        //自定义线程池
+        Scheduler scheduler=Schedulers.single();
+        if (isVip){
+            scheduler=vipScheduler;
+        }
+        modelDataFlowable
+                // 异步线程池执行
+                .observeOn(scheduler)
+                .map(chunk -> chunk.getChoices().get(0).getDelta().getContent())
+                .map(message -> message.replaceAll("\\s", ""))
+                .filter(StrUtil::isNotBlank)
+                .flatMap(message -> {
+                    // 将字符串转换为 List<Character>
+                    List<Character> charList = new ArrayList<>();
+                    for (char c : message.toCharArray()) {
+                        charList.add(c);
+                    }
+                    return Flowable.fromIterable(charList);
+                })
+                .doOnNext(c -> {
+                    {
+                        // 识别第一个 [ 表示开始 AI 传输 json 数据，打开 flag 开始拼接 json 数组
+                        if (c == '{') {
+                            flag.addAndGet(1);
+                        }
+                        if (flag.get() > 0) {
+                            contentBuilder.append(c);
+                        }
+                        if (c == '}') {
+                            flag.addAndGet(-1);
+                            if (flag.get() == 0) {
+                                System.out.println(Thread.currentThread().getName());
+                                if (!isVip){
+                                    Thread.sleep(10000L);
+                                }
+                                // 累积单套题目满足 json 格式后，sse 推送至前端
+                                // sse 需要压缩成当行 json，sse 无法识别换行
+                                emitter.send(JSONUtil.toJsonStr(contentBuilder.toString()));
+                                // 清空 StringBuilder
+                                contentBuilder.setLength(0);
+                            }
+                        }
+                    }
+                }).doOnComplete(emitter::complete).subscribe();
+        return emitter;
     }
 
     // endregion

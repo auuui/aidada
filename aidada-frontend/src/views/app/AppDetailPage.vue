@@ -33,9 +33,9 @@
           </p>
           <a-space size="medium">
             <a-button type="primary" :href="`/answer/do/${id}`"
-              >开始答题</a-button
-            >
-            <a-button>分享应用</a-button>
+              >开始答题
+            </a-button>
+            <a-button @click="doShare">分享应用</a-button>
             <a-button v-if="isMy" :href="`/add/question/${id}`"
               >设置题目
             </a-button>
@@ -53,6 +53,7 @@
       </a-row>
     </a-card>
   </div>
+  <ShareModal :link="shareLink" title="应用分享" ref="shareModalRef" />
 </template>
 
 <script setup lang="ts">
@@ -64,6 +65,7 @@ import API from "@/api";
 import { dayjs } from "@arco-design/web-vue/es/_utils/date";
 import { useLoginUserStore } from "@/store/userStore";
 import { APP_SCORING_STRATEGY_MAP, APP_TYPE_MAP } from "../../constant/app";
+import ShareModal from "@/components/ShareModal.vue";
 
 //初始值，不应该被修改
 const initSearchParams = {
@@ -124,6 +126,20 @@ const onPageChange = (page: number) => {
 watchEffect(() => {
   loadData();
 });
+
+//分享弹窗的引用
+const shareModalRef = ref();
+
+//分享链接
+const shareLink = `${window.location.protocol}//${window.location.host}/app/detail/${props.id}`;
+
+const doShare = (e: Event) => {
+  if (shareModalRef.value) {
+    shareModalRef.value.openModal();
+  }
+  //停止冒泡，防止跳转到详情页
+  e.stopPropagation();
+};
 </script>
 
 <style scoped>

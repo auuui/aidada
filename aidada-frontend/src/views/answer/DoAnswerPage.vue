@@ -30,9 +30,7 @@
             type="primary"
             v-if="current === questionContent.length"
             circle
-            :disabled="!currentAnswer"
             @click="doSubmit"
-            :loading="submitting"
           >
             {{ submitting ? "测评中" : "查看结果" }}
           </a-button>
@@ -70,7 +68,10 @@ import {
   editQuestionUsingPost,
   listQuestionVoByPageUsingPost,
 } from "@/api/questionController";
-import { addUserAnswerUsingPost } from "@/api/userAnswerController";
+import {
+  addUserAnswerUsingPost,
+  generateUserAnswerIdUsingGet,
+} from "@/api/userAnswerController";
 
 interface Props {
   appId: string;
@@ -109,6 +110,24 @@ const answerList = reactive<string[]>([]);
 
 //是否正在提交
 const submitting = ref(false);
+
+// 唯一 id
+const id = ref<number>();
+
+// 生成唯一 id
+const generateId = async () => {
+  let res: any = await generateUserAnswerIdUsingGet();
+  if (res.data.code === 0) {
+    id.value = res.data.data as any;
+  } else {
+    message.error("获取唯一 id 失败，" + res.data.message);
+  }
+};
+
+//进入页面时，生成唯一id
+watchEffect(() => {
+  generateId();
+});
 
 /**
  * 添加题目选项
@@ -219,6 +238,7 @@ const doSubmit = async () => {
   const res = await addUserAnswerUsingPost({
     appId: props.appId as any,
     choices: answerList,
+    id: id.value as any,
   });
 
   if (res.data.code === 0 && res.data.data) {

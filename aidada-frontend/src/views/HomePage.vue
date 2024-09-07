@@ -35,6 +35,7 @@ import API from "@/api";
 import { REVIEW_STATUS_ENUM } from "@/constant/app";
 import AppCard from "@/components/AppCard.vue";
 import { listAppVoByPageUsingPost } from "@/api/appController";
+import ShareModal from "@/components/ShareModal.vue";
 
 //初始值，不应该被修改
 const initSearchParams = {

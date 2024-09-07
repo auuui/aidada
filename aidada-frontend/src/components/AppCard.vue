@@ -1,7 +1,7 @@
 <template>
   <a-card class="appCard" hoverable @click="doCardClick">
     <template #actions>
-      <span class="icon-hover"> <IconShareInternal /> </span>
+      <span class="icon-hover" @click="doShare"> <IconShareInternal /> </span>
     </template>
     <template #cover>
       <div
@@ -27,13 +27,14 @@
             :image-url="app.user?.userAvatar"
             :style="{ marginRight: '8px' }"
           />
-          <a-typography-text>{{
-            app.user?.userName ?? "无名"
-          }}</a-typography-text>
+          <a-typography-text
+            >{{ app.user?.userName ?? "无名" }}
+          </a-typography-text>
         </div>
       </template>
     </a-card-meta>
   </a-card>
+  <ShareModal :link="shareLink" title="应用分享" ref="shareModalRef" />
 </template>
 
 <script setup lang="ts">
@@ -43,8 +44,9 @@ import {
   IconMore,
 } from "@arco-design/web-vue/es/icon";
 import API from "@/api";
-import { withDefaults, defineProps } from "vue";
+import { withDefaults, defineProps, ref } from "vue";
 import { useRouter } from "vue-router";
+import ShareModal from "@/components/ShareModal.vue";
 
 interface Props {
   app: API.AppVO;
@@ -59,6 +61,19 @@ const props = withDefaults(defineProps<Props>(), {
 const router = useRouter();
 const doCardClick = () => {
   router.push(`/app/detail/${props.app.id}`);
+};
+//分享弹窗的引用
+const shareModalRef = ref();
+
+//分享链接
+const shareLink = `${window.location.protocol}//${window.location.host}/app/detail/${props.app.id}`;
+
+const doShare = (e: Event) => {
+  if (shareModalRef.value) {
+    shareModalRef.value.openModal();
+  }
+  //停止冒泡，防止跳转到详情页
+  e.stopPropagation();
 };
 </script>
 <style scoped>
