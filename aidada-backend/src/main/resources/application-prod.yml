@@ -13,15 +13,16 @@ spring:
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/aidada
+    url: jdbc:mysql://192.168.244.144:3306/aidada
     username: root
-    password: 1234
+    password: 123456
   # Redis 配置
   redis:
     database: 1
-    host: localhost
+    host: 192.168.244.144:3306
     port: 6379
     timeout: 5000
+    password: 123321
     shardingsphere:
       #数据源配置
       datasource:
@@ -30,9 +31,9 @@ spring:
         aidada:
           type: com.zaxxer.hikari.HikariDataSource
           driver-class-name: com.mysql.cj.jdbc.Driver
-          jdbc-url: jdbc:mysql://localhost:3306/aidada?allowPublicKeyRetrieval=true&useSSL=false&autoReconnect=true&characterEncoding=utf8
+          jdbc-url: jdbc:mysql://192.168.244.144:3306/aidada?allowPublicKeyRetrieval=true&useSSL=false&autoReconnect=true&characterEncoding=utf8
           username: root
-          password: 1234
+          password: 123456
       # 规则配置
       rules:
         sharding:
